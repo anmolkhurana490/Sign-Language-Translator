@@ -1,0 +1,5 @@
+ISL_CSLRT_Corpus
+
+.venv
+__pycache__
+*.pyc
