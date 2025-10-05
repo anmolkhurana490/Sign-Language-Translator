@@ -1,4 +1,6 @@
 import React, { useState, useRef } from 'react'
+import { createSocketConnection, sendImageFile } from './handler'
+
 import {
     FaPlay,
     FaStop,
@@ -16,10 +18,15 @@ const Sign2Text = () => {
     // Live Camera
     const videoRef = useRef(null)
     const [isLiveCameraOpen, setIsLiveCameraOpen] = useState(false)
+    const [captureIntervalId, setCaptureIntervalId] = useState(null)
+    const fps = 4
 
     // File Upload
     const [uploadFileUrl, setUploadFileUrl] = useState(null)
     const [uploadFileType, setUploadFileType] = useState('video')
+
+    // Web socket
+    const socketRef = useRef(null)
 
     // Translation Results
     const [translatedText, setTranslatedText] = useState('')
@@ -27,10 +34,11 @@ const Sign2Text = () => {
     const [isProcessing, setIsProcessing] = useState(false)
 
     const toggleRecording = () => {
-        // Simulate starting live camera
         if (!isLiveCameraOpen) {
-            // Clear uploaded video when starting live camera
+            // Starting live camera
+
             if (uploadFileUrl) {
+                // Clear uploaded video when starting live camera
                 URL.revokeObjectURL(uploadFileUrl)
                 setUploadFileUrl(null)
                 setUploadFileType('video')
@@ -81,20 +89,95 @@ const Sign2Text = () => {
         }
     }
 
+    const sendFrame = () => {
+        if (!videoRef.current || !socketRef.current) {
+            console.warn("Video or Socket not available")
+            return;
+        }
+        if (socketRef.current.readyState !== WebSocket.OPEN) {
+            console.warn("WebSocket is not open")
+            return;
+        }
+
+        const video = videoRef.current
+        const canvas = document.createElement('canvas')
+
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+        let frameData = canvas.toDataURL('image/jpeg', 0.8);
+
+        // Send frameData to backend for processing
+        socketRef.current.send(frameData)
+    }
+
+    const establishSocketConnection = () => {
+        // Create Socket connection
+        socketRef.current = createSocketConnection(socketRef)
+
+        // Wait for socket to open
+        socketRef.current.onopen = () => {
+            console.log("WebSocket connected")
+            const intervalId = setInterval(sendFrame, 1000 / fps)
+            setCaptureIntervalId(intervalId)
+        }
+
+        socketRef.current.onmessage = (event) => {
+            const data = JSON.parse(event.data)
+            console.log(data.result)
+            // setTranslatedText(data.text || '')
+            // setConfidence(data.confidence ? Math.round(data.confidence * 100) : 0)
+        }
+
+        socketRef.current.onerror = (error) => {
+            console.error("WebSocket error: ", error)
+            setIsProcessing(false)
+        }
+
+        socketRef.current.onclose = () => {
+            console.log("WebSocket disconnected")
+            if (captureIntervalId) {
+                clearInterval(captureIntervalId)
+                setCaptureIntervalId(null)
+            }
+            setIsProcessing(false)
+        }
+    }
+
+
+    // Start/Stop real-time or image/video translation
+    const toggleTranslation = () => {
+        if (!isProcessing) {
+            // Start translation processing
+
+            // For Real-time Camera / Video File
+            if (uploadFileType === 'video' && !captureIntervalId) {
+                establishSocketConnection()
+            }
+            else if (uploadFileUrl && uploadFileType === 'image') {
+                // For Uploaded Image File
+                sendImageFile(uploadFileUrl)
+            }
+
+            setIsProcessing(true)
+        }
+        else {
+            // Stop translation processing
+            if (captureIntervalId) {
+                clearInterval(captureIntervalId)
+                setCaptureIntervalId(null)
+            }
+            if (socketRef.current) {
+                socketRef.current.close()
+                socketRef.current = null
+            }
+            setIsProcessing(false)
+        }
+    }
 
     const clearText = () => {
         setTranslatedText('')
         setConfidence(0)
-    }
-
-    // Simulate real-time translation (for demo purposes)
-    const simulateTranslation = () => {
-        setIsProcessing(true)
-        setTimeout(() => {
-            setTranslatedText('Hello, how are you today?')
-            setConfidence(95)
-            setIsProcessing(false)
-        }, 2000)
     }
 
     return (
@@ -117,10 +200,11 @@ const Sign2Text = () => {
                             isLiveCameraOpen={isLiveCameraOpen}
                             toggleRecording={toggleRecording}
                             videoRef={videoRef}
-                            simulateTranslation={simulateTranslation}
+                            toggleTranslation={toggleTranslation}
                             handleFileUpload={handleFileUpload}
                             uploadFileUrl={uploadFileUrl}
                             uploadFileType={uploadFileType}
+                            isProcessing={isProcessing}
                         />
 
                         {/* Camera Settings */}
@@ -189,7 +273,7 @@ const Sign2Text = () => {
     )
 }
 
-const CameraFeedSection = ({ isLiveCameraOpen, toggleRecording, videoRef, simulateTranslation, handleFileUpload, uploadFileUrl, uploadFileType }) => {
+const CameraFeedSection = ({ isLiveCameraOpen, toggleRecording, videoRef, toggleTranslation, handleFileUpload, uploadFileUrl, uploadFileType, isProcessing }) => {
 
     return (
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-200">
@@ -210,8 +294,7 @@ const CameraFeedSection = ({ isLiveCameraOpen, toggleRecording, videoRef, simula
                     src={uploadFileUrl}
                     className="w-full h-full object-cover"
                     style={{ display: uploadFileType === 'video' ? 'block' : 'none' }}
-                    autoPlay
-                    muted
+                    autoPlay muted loop
                     playsInline
                 />
 
@@ -275,13 +358,21 @@ const CameraFeedSection = ({ isLiveCameraOpen, toggleRecording, videoRef, simula
                     </span>
                 </button>
 
-                <button
-                    onClick={simulateTranslation}
+
+                {!isProcessing && (<button
+                    onClick={toggleTranslation}
                     disabled={!isLiveCameraOpen && !uploadFileUrl}
                     className="px-6 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all duration-200"
                 >
                     Translate
-                </button>
+                </button>)}
+
+                {isProcessing && (<button
+                    onClick={toggleTranslation}
+                    className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold transition-all duration-200"
+                >
+                    Stop
+                </button>)}
             </div>
         </div>
     )

@@ -1,36 +1,12 @@
 import numpy as np
 import torch
 from torch import nn
+import json
 
 in_channels = 3
 num_nodes = 67
 
-# ----- Word Level Model -----
-class WordLevelModel(nn.Module):
-  def __init__(self, input_size, hidden_sizes, dropout_rates, output_size):
-    super().__init__()
-
-    classifier_layers = [nn.Flatten()]
-
-    for size, rate in zip(hidden_sizes, dropout_rates):
-      classifier_layers.extend([
-          nn.Linear(input_size, size),
-          nn.BatchNorm1d(size),
-          nn.ReLU(),
-          nn.Dropout(rate)
-      ])
-
-      input_size = size
-
-    classifier_layers.append(nn.Linear(input_size, output_size))
-
-    self.classifier = nn.Sequential(*classifier_layers)
-
-
-  def forward(self, x):
-    out = self.classifier(x)
-    return out
-
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # ----- Frame Encoder -----
 class FrameEncoder(nn.Module):
@@ -163,17 +139,8 @@ class MyModel(nn.Module):
         return out
 
 
-# ----- Load Models -----
-def load_word_level_model(state_dict_path):
-    state_dict = torch.load(state_dict_path, map_location='cpu')
-    model = WordLevelModel(in_channels * num_nodes, [1472, 3520], [0.2, 0.2], 114)
-
-    model.load_state_dict(state_dict)
-    model.eval()
-
-    return model
-
-def load_sentence_level_model(state_dict_path):
+# ----- Load Model -----
+def load_sentence_model(state_dict_path):
     state_dict = torch.load(state_dict_path, map_location='cpu')
 
     model = MyModel(
@@ -188,9 +155,30 @@ def load_sentence_level_model(state_dict_path):
     return model
 
 
-if __name__ == "__main__":
-    model1 = load_word_level_model("saved_models/word_level_model_states_v3.pth")
-    model2 = load_sentence_level_model("saved_models/sentence_level_model_states_v3.pth")
+def load_json(file_path):
+  with open(file_path, 'r') as f:
+    return json.load(f)
 
-    print(model1)
-    print(model2)
+# ----- Label Decoder -----
+sentence_decoder = load_json("data/sentence_class_names.json")
+
+
+# ----- Predict Sentence Gloss -----
+def predict_sentence_gloss(model, frame_seq):
+    if not frame_seq or len(frame_seq) == 0:
+        return "", 0.0
+    
+    x = torch.stack(frame_seq).unsqueeze(0).to(device)
+    x = x[:, :, :num_nodes, :in_channels].to(torch.float32)
+
+    with torch.no_grad():
+        out = model(x)
+        out = nn.functional.sigmoid(out)
+
+    val, ypred = torch.max(out, 1)
+    return sentence_decoder[ypred.item()], val.item()
+
+
+if __name__ == "__main__":
+    model = load_sentence_model("saved_models/sentence_level_model_states_v3.pth")
+    print(model)
