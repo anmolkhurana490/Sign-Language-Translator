@@ -29,10 +29,12 @@ const Sign2Text = () => {
     const [uploadFileUrl, setUploadFileUrl] = useState(null)
     const [uploadFileType, setUploadFileType] = useState('video')
     const [isLiveCameraOpen, setIsLiveCameraOpen] = useState(false)
-    const [mirror, setMirror] = useState(false)
     const videoRef = useRef(null)
 
-    const fps = 4
+    // Camera settings
+    const [resolution, setResolution] = useState({ width: 640, height: 480 }) // Default resolution
+    const [fps, setFps] = useState(4) // Frames per second for processing
+    const [mirror, setMirror] = useState(false)
 
     const toggleRecording = () => {
         if (!isLiveCameraOpen) {
@@ -45,7 +47,7 @@ const Sign2Text = () => {
                 setUploadFileType('video')
             }
 
-            navigator.mediaDevices.getUserMedia({ video: true })
+            navigator.mediaDevices.getUserMedia({ video: true, width: resolution.width, height: resolution.height })
                 .then(stream => {
                     if (videoRef.current) {
                         videoRef.current.srcObject = stream
@@ -146,6 +148,7 @@ const Sign2Text = () => {
 
     // Start real-time or image/video translation
     const startTranslation = async () => {
+        clearText()
         setIsProcessing(true)
 
         // For Real-time Camera / Video File
@@ -232,19 +235,30 @@ const Sign2Text = () => {
                             <div className="space-y-4 flex flex-wrap gap-4 justify-around items-center">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Resolution</label>
-                                    <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                        <option>1280x720 (HD)</option>
-                                        <option>1920x1080 (Full HD)</option>
-                                        <option>640x480 (Standard)</option>
+                                    <select
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        value={`${resolution.width}x${resolution.height}`}
+                                        onChange={(e) => {
+                                            const [width, height] = e.target.value.split('x').map(Number)
+                                            setResolution({ width, height })
+                                        }}
+                                    >
+                                        <option value={'1280x720'}>1280x720 (HD)</option>
+                                        <option value={'1920x1080'}>1920x1080 (Full HD)</option>
+                                        <option value={'640x480'}>640x480 (Standard)</option>
                                     </select>
                                 </div>
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Frame Rate</label>
-                                    <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                        <option>30 FPS</option>
-                                        <option>60 FPS</option>
-                                        <option>24 FPS</option>
+                                    <select
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        value={fps}
+                                        onChange={(e) => setFps(Number(e.target.value))}
+                                    >
+                                        <option value={3}>3 FPS</option>
+                                        <option value={4}>4 FPS</option>
+                                        <option value={5}>5 FPS</option>
                                     </select>
                                 </div>
 
@@ -308,7 +322,7 @@ const CameraFeedSection = ({ isLiveCameraOpen, toggleRecording, videoRef, startT
                 <div className="flex items-center space-x-2">
                     <div className={`w-3 h-3 rounded-full ${isLiveCameraOpen ? 'bg-red-500 animate-pulse' : 'bg-gray-300'}`}></div>
                     <span className="text-sm text-gray-600">
-                        {isLiveCameraOpen ? 'Recording' : 'Stopped'}
+                        {isLiveCameraOpen ? 'Recording' : uploadFileUrl ? 'File Uploaded' : 'Stopped'}
                     </span>
                 </div>
             </div>
@@ -409,6 +423,31 @@ const CameraFeedSection = ({ isLiveCameraOpen, toggleRecording, videoRef, startT
 }
 
 const TranslationResultsSection = ({ translatedText, confidence, isProcessing, clearText }) => {
+    const [copied, setCopied] = useState(false)
+    const [saved, setSaved] = useState(false)
+
+    const copyText = () => {
+        if (translatedText) {
+            navigator.clipboard.writeText(translatedText)
+
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+        }
+    }
+
+    const saveTextAsFile = () => {
+        if (translatedText) {
+            console.log("Text saved: ", translatedText)
+
+            setSaved(true)
+            setTimeout(() => setSaved(false), 2000)
+        }
+    }
+
+    useEffect(() => {
+        setCopied(false)
+        setSaved(false)
+    }, [translatedText])
 
     return (
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-200">
@@ -463,18 +502,19 @@ const TranslationResultsSection = ({ translatedText, confidence, isProcessing, c
                     disabled={!translatedText}
                     className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-all duration-200"
                 >
-                    <span className="flex items-center justify-center">
+                    <span className="flex items-center justify-center" onClick={copyText}>
                         <FaCopy className="w-4 h-4 mr-2" />
-                        Copy Text
+                        {copied ? 'Copied!' : 'Copy Text'}
                     </span>
                 </button>
                 <button
                     disabled={!translatedText}
                     className="flex-1 px-4 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-all duration-200"
+                    onClick={saveTextAsFile}
                 >
                     <span className="flex items-center justify-center">
                         <Download className="w-4 h-4 mr-2" />
-                        Save
+                        {saved ? 'Saved!' : 'Save as File'}
                     </span>
                 </button>
             </div>
