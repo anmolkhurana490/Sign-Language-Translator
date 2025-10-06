@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { createSocketConnection, sendImageFile } from './handler'
 
 import {
@@ -15,23 +15,24 @@ import {
 } from 'lucide-react'
 
 const Sign2Text = () => {
-    // Live Camera
-    const videoRef = useRef(null)
-    const [isLiveCameraOpen, setIsLiveCameraOpen] = useState(false)
-    const [captureIntervalId, setCaptureIntervalId] = useState(null)
-    const fps = 4
-
-    // File Upload
-    const [uploadFileUrl, setUploadFileUrl] = useState(null)
-    const [uploadFileType, setUploadFileType] = useState('video')
-
-    // Web socket
-    const socketRef = useRef(null)
-
-    // Translation Results
+    // Core processing states
+    const [isProcessing, setIsProcessing] = useState(false)
     const [translatedText, setTranslatedText] = useState('')
     const [confidence, setConfidence] = useState(0)
-    const [isProcessing, setIsProcessing] = useState(false)
+
+    // WebSocket & processing
+    const [captureIntervalId, setCaptureIntervalId] = useState(null)
+    const socketRef = useRef(null)
+
+    // Global camera/file states
+    const [uploadFile, setUploadFile] = useState(null)
+    const [uploadFileUrl, setUploadFileUrl] = useState(null)
+    const [uploadFileType, setUploadFileType] = useState('video')
+    const [isLiveCameraOpen, setIsLiveCameraOpen] = useState(false)
+    const [mirror, setMirror] = useState(false)
+    const videoRef = useRef(null)
+
+    const fps = 4
 
     const toggleRecording = () => {
         if (!isLiveCameraOpen) {
@@ -54,8 +55,7 @@ const Sign2Text = () => {
                     console.error("Error accessing camera: ", err)
                 })
 
-            setTranslatedText('')
-            setConfidence(0)
+            clearText()
         }
         else {
             // Stop all video tracks
@@ -69,6 +69,39 @@ const Sign2Text = () => {
         setIsLiveCameraOpen(!isLiveCameraOpen)
     }
 
+    const establishSocketConnection = () => {
+        // Create Socket connection
+        socketRef.current = createSocketConnection(socketRef)
+
+        // Wait for socket to open
+        socketRef.current.onopen = () => {
+            console.log("WebSocket connected")
+            const intervalId = setInterval(sendFrame, 1000 / fps)
+            setCaptureIntervalId(intervalId)
+        }
+
+        socketRef.current.onmessage = (event) => {
+            const data = JSON.parse(event.data)
+            processTranslatedText(data.result)
+        }
+
+        socketRef.current.onerror = (error) => {
+            console.error("WebSocket error: ", error)
+            // setIsProcessing(false)
+            socketRef.current.close()
+        }
+
+        socketRef.current.onclose = () => {
+            console.log("WebSocket disconnected")
+            if (captureIntervalId) {
+                clearInterval(captureIntervalId)
+                setCaptureIntervalId(null)
+            }
+            setIsProcessing(false)
+        }
+    }
+
+    // File handling
     const handleFileUpload = (event) => {
         const file = event.target.files[0]
 
@@ -82,10 +115,10 @@ const Sign2Text = () => {
             const url = URL.createObjectURL(file)
             setUploadFileUrl(url)
 
+            setUploadFile(file)
             setUploadFileType(file.type.startsWith('image/') ? 'image' : 'video')
 
-            setTranslatedText('')
-            setConfidence(0)
+            clearText()
         }
     }
 
@@ -111,67 +144,53 @@ const Sign2Text = () => {
         socketRef.current.send(frameData)
     }
 
-    const establishSocketConnection = () => {
-        // Create Socket connection
-        socketRef.current = createSocketConnection(socketRef)
+    // Start real-time or image/video translation
+    const startTranslation = async () => {
+        setIsProcessing(true)
 
-        // Wait for socket to open
-        socketRef.current.onopen = () => {
-            console.log("WebSocket connected")
-            const intervalId = setInterval(sendFrame, 1000 / fps)
-            setCaptureIntervalId(intervalId)
-        }
-
-        socketRef.current.onmessage = (event) => {
-            const data = JSON.parse(event.data)
-            console.log(data.result)
-            // setTranslatedText(data.text || '')
-            // setConfidence(data.confidence ? Math.round(data.confidence * 100) : 0)
-        }
-
-        socketRef.current.onerror = (error) => {
-            console.error("WebSocket error: ", error)
-            setIsProcessing(false)
-        }
-
-        socketRef.current.onclose = () => {
-            console.log("WebSocket disconnected")
-            if (captureIntervalId) {
-                clearInterval(captureIntervalId)
-                setCaptureIntervalId(null)
+        // For Real-time Camera / Video File
+        if (uploadFileType === 'video' && !captureIntervalId) {
+            // If video file is uploaded, restart the video
+            if (uploadFile) {
+                videoRef.current.currentTime = 0
+                videoRef.current.play()
             }
+
+            establishSocketConnection()
+        }
+        else if (uploadFile && uploadFileType === 'image') {
+            // For Uploaded Image File
+            const result = await sendImageFile(uploadFile)
+            processTranslatedText(result)
+
             setIsProcessing(false)
         }
     }
 
-
-    // Start/Stop real-time or image/video translation
-    const toggleTranslation = () => {
-        if (!isProcessing) {
-            // Start translation processing
-
-            // For Real-time Camera / Video File
-            if (uploadFileType === 'video' && !captureIntervalId) {
-                establishSocketConnection()
-            }
-            else if (uploadFileUrl && uploadFileType === 'image') {
-                // For Uploaded Image File
-                sendImageFile(uploadFileUrl)
-            }
-
-            setIsProcessing(true)
+    // Stop translation processing
+    const stopTranslation = () => {
+        if (captureIntervalId) {
+            clearInterval(captureIntervalId)
+            setCaptureIntervalId(null)
         }
-        else {
-            // Stop translation processing
-            if (captureIntervalId) {
-                clearInterval(captureIntervalId)
-                setCaptureIntervalId(null)
-            }
-            if (socketRef.current) {
-                socketRef.current.close()
-                socketRef.current = null
-            }
-            setIsProcessing(false)
+        if (socketRef.current) {
+            socketRef.current.close()
+            socketRef.current = null
+        }
+        setIsProcessing(false)
+    }
+
+    // Process Translation Results
+    const processTranslatedText = (data) => {
+        if (data && data.text) {
+            const text = data.text.trim()
+            setTranslatedText(prev => prev + " " + text)
+
+            const word_conf = data.word_confidence || 0
+            const sentence_conf = data.sentence_confidence || 0
+
+            const max_conf = Math.max(word_conf, sentence_conf).toFixed(4)
+            setConfidence(Number(max_conf) * 100)
         }
     }
 
@@ -197,14 +216,14 @@ const Sign2Text = () => {
                     {/* Camera Section */}
                     <div className="space-y-6">
                         <CameraFeedSection
-                            isLiveCameraOpen={isLiveCameraOpen}
-                            toggleRecording={toggleRecording}
+                            isLiveCameraOpen={isLiveCameraOpen} toggleRecording={toggleRecording}
                             videoRef={videoRef}
-                            toggleTranslation={toggleTranslation}
+                            startTranslation={startTranslation} stopTranslation={stopTranslation}
                             handleFileUpload={handleFileUpload}
                             uploadFileUrl={uploadFileUrl}
                             uploadFileType={uploadFileType}
                             isProcessing={isProcessing}
+                            mirror={mirror}
                         />
 
                         {/* Camera Settings */}
@@ -219,6 +238,7 @@ const Sign2Text = () => {
                                         <option>640x480 (Standard)</option>
                                     </select>
                                 </div>
+
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Frame Rate</label>
                                     <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
@@ -227,10 +247,16 @@ const Sign2Text = () => {
                                         <option>24 FPS</option>
                                     </select>
                                 </div>
-                                <div className="flex items-center">
-                                    <input type="checkbox" id="mirrored" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+
+                                {isLiveCameraOpen && (<div className="flex items-center">
+                                    <input
+                                        type="checkbox" id="mirrored"
+                                        checked={mirror}
+                                        onChange={() => setMirror(!mirror)}
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
                                     <label htmlFor="mirrored" className="ml-2 text-sm text-gray-700">Mirror camera feed</label>
-                                </div>
+                                </div>)}
                             </div>
                         </div>
                     </div>
@@ -273,7 +299,7 @@ const Sign2Text = () => {
     )
 }
 
-const CameraFeedSection = ({ isLiveCameraOpen, toggleRecording, videoRef, toggleTranslation, handleFileUpload, uploadFileUrl, uploadFileType, isProcessing }) => {
+const CameraFeedSection = ({ isLiveCameraOpen, toggleRecording, videoRef, startTranslation, stopTranslation, handleFileUpload, uploadFileUrl, uploadFileType, isProcessing, mirror }) => {
 
     return (
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-200">
@@ -293,8 +319,12 @@ const CameraFeedSection = ({ isLiveCameraOpen, toggleRecording, videoRef, toggle
                     ref={videoRef}
                     src={uploadFileUrl}
                     className="w-full h-full object-cover"
-                    style={{ display: uploadFileType === 'video' ? 'block' : 'none' }}
-                    autoPlay muted loop
+                    style={{
+                        display: uploadFileType === 'video' ? 'block' : 'none',
+                        transform: isLiveCameraOpen && mirror ? 'scale(-1,1)' : 'none'
+                    }}
+                    onEnded={stopTranslation}
+                    autoPlay muted
                     playsInline
                 />
 
@@ -360,7 +390,7 @@ const CameraFeedSection = ({ isLiveCameraOpen, toggleRecording, videoRef, toggle
 
 
                 {!isProcessing && (<button
-                    onClick={toggleTranslation}
+                    onClick={startTranslation}
                     disabled={!isLiveCameraOpen && !uploadFileUrl}
                     className="px-6 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all duration-200"
                 >
@@ -368,7 +398,7 @@ const CameraFeedSection = ({ isLiveCameraOpen, toggleRecording, videoRef, toggle
                 </button>)}
 
                 {isProcessing && (<button
-                    onClick={toggleTranslation}
+                    onClick={stopTranslation}
                     className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold transition-all duration-200"
                 >
                     Stop
@@ -394,14 +424,7 @@ const TranslationResultsSection = ({ translatedText, confidence, isProcessing, c
 
             {/* Translation Output */}
             <div className="min-h-[200px] p-4 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 mb-4">
-                {isProcessing ? (
-                    <div className="flex items-center justify-center h-full">
-                        <div className="text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-3" />
-                            <p className="text-gray-600">Processing sign language...</p>
-                        </div>
-                    </div>
-                ) : translatedText ? (
+                {translatedText ? (
                     <div>
                         <p className="text-lg text-gray-800 leading-relaxed">{translatedText}</p>
                         {confidence > 0 && (
@@ -416,6 +439,13 @@ const TranslationResultsSection = ({ translatedText, confidence, isProcessing, c
                                 <span className="text-sm font-medium text-gray-800">{confidence}%</span>
                             </div>
                         )}
+                    </div>
+                ) : isProcessing ? (
+                    <div className="flex items-center justify-center h-full">
+                        <div className="text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-3" />
+                            <p className="text-gray-600">Processing sign language...</p>
+                        </div>
                     </div>
                 ) : (
                     <div className="flex items-center justify-center h-full text-gray-500">
