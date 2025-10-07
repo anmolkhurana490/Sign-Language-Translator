@@ -17,6 +17,7 @@ import {
 const Sign2Text = () => {
     // Core processing states
     const [isProcessing, setIsProcessing] = useState(false)
+    const [isStopping, setIsStopping] = useState(false)
     const [translatedText, setTranslatedText] = useState('')
     const [confidence, setConfidence] = useState(0)
 
@@ -176,17 +177,22 @@ const Sign2Text = () => {
             clearInterval(captureIntervalId)
             setCaptureIntervalId(null)
         }
-        if (socketRef.current) {
-            socketRef.current.close()
-            socketRef.current = null
-        }
-        setIsProcessing(false)
+        setTimeout(() => {
+            if (socketRef.current) {
+                socketRef.current.close()
+                socketRef.current = null
+                setIsProcessing(false)
+                setIsStopping(false)
+            }
+        }, 5000) // Delay to ensure all generated text is received before closing
+
+        setIsStopping(true)
     }
 
     // Process Translation Results
     const processTranslatedText = (data) => {
         if (data && data.text) {
-            const text = data.text.trim()
+            const text = data.text.trim().toLowerCase()
             setTranslatedText(prev => prev + " " + text)
 
             const word_conf = data.word_confidence || 0
@@ -225,7 +231,7 @@ const Sign2Text = () => {
                             handleFileUpload={handleFileUpload}
                             uploadFileUrl={uploadFileUrl}
                             uploadFileType={uploadFileType}
-                            isProcessing={isProcessing}
+                            isProcessing={isProcessing} isStopping={isStopping}
                             mirror={mirror}
                         />
 
@@ -313,7 +319,7 @@ const Sign2Text = () => {
     )
 }
 
-const CameraFeedSection = ({ isLiveCameraOpen, toggleRecording, videoRef, startTranslation, stopTranslation, handleFileUpload, uploadFileUrl, uploadFileType, isProcessing, mirror }) => {
+const CameraFeedSection = ({ isLiveCameraOpen, toggleRecording, videoRef, startTranslation, stopTranslation, handleFileUpload, uploadFileUrl, uploadFileType, isProcessing, isStopping, mirror }) => {
 
     return (
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-200">
@@ -413,7 +419,8 @@ const CameraFeedSection = ({ isLiveCameraOpen, toggleRecording, videoRef, startT
 
                 {isProcessing && (<button
                     onClick={stopTranslation}
-                    className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold transition-all duration-200"
+                    disabled={isStopping}
+                    className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold transition-all duration-200 disabled:bg-gray-300"
                 >
                     Stop
                 </button>)}

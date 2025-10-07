@@ -1,4 +1,4 @@
-from openai import OpenAI
+from google import genai
 from collections import deque
 import time
 
@@ -7,27 +7,21 @@ import os
 
 load_dotenv()
 
-client = OpenAI(
-  base_url="https://openrouter.ai/api/v1",
-  api_key=os.getenv('OPENROUTER_API_KEY'),
-)
+client = genai.Client()
 
 # generator = pipeline(task='text-generation', model="meta-llama/Llama-3.2-3B-Instruct")
 
 def generator(prompt, max_new_tokens=50):
-    response = client.chat.completions.create(
-      model="meta-llama/Llama-3.2-3B-Instruct",
-      messages = [
-        {
-          "role": "user",
-          "content": prompt
-        }
-      ],
-      max_tokens=max_new_tokens,
-      temperature=0.7,
-    )
-
-    return response.choices[0].message.content
+    try:
+      response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt
+      )
+      return response.text
+    
+    except Exception as e:
+      print(f"Error in text generation: {e}")
+      return ""
 
 def generate_text(gloss_input, last_text=''):
     instruct = 'You are a gloss-to-English converter. Output only the sentence using only the gloss token. No need to complete it with additional words. No explanations.'
@@ -35,7 +29,12 @@ def generate_text(gloss_input, last_text=''):
 
     max_tokens = len(gloss_input.split()) + len(prompt.split())
 
+    start = time.time()
     output = generator(prompt, max_new_tokens=max_tokens)
+    # output = gloss_input
+    
+    end = time.time()
+    print(f"Time taken for generation: {end - start} seconds")
 
     if prompt in output:
         output = output.replace(prompt, '').strip()
@@ -94,24 +93,18 @@ class GlossBuffer:
 
 import random
 
-def generate_continue_text(gloss_buffer, text_buffer, text=''):
-  # gloss prediction simulation from given text
-  for gloss_input in text.split():
-    time.sleep(0.5)
+def generate_continue_text(gloss_buffer, text_buffer):
+  gloss_text = gloss_buffer.get_gloss_text()
 
-    gloss_input = gloss_input.split('_')[0]
-    gloss_buffer.append_gloss(gloss_input)
+  if gloss_text != '':
+    text_list = list(text_buffer)
+    gen_text = generate_text(gloss_text, ' '.join(text_list))
 
-    if random.random() < CONF_THRESHOLD:
-      continue
-
-    gloss_text = gloss_buffer.get_gloss_text()
-
-    if gloss_text != '':
-      text_list = list(text_buffer)
-      gen_text = generate_text(gloss_text, ' '.join(text_list))
+    if gen_text and gen_text.strip() != '':
       text_buffer.extend(gen_text.split())
-      print(gen_text)
+      return gen_text
+    
+  return ''
 
 def create_text_buffer(max_size=50):
     return deque(maxlen=max_size)
@@ -119,6 +112,9 @@ def create_text_buffer(max_size=50):
 if __name__ == "__main__":
     text = "HELLO HOW YOU/YOUR FEEL TODAY I/ME THINK FUTURE CAREER PLAN YOU/YOUR LIKE/LOVE BOOK_READ OR MOVIE/FILM"
     gloss_buffer = GlossBuffer()
+
     text_buffer = create_text_buffer()
 
-    generate_continue_text(gloss_buffer, text_buffer, text)
+    for word in text.split():
+      gloss_buffer.append_gloss(word)
+      generate_continue_text(gloss_buffer, text_buffer)
