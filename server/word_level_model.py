@@ -70,3 +70,7 @@ def predict_word_gloss(model, x):
 if __name__ == "__main__":
     model = load_word_model("saved_models/word_level_model_states_v3.pth")
     print(model)
+
+    x = torch.randn((67, 3))
+    word, confidence = predict_word_gloss(model, x)
+    print(f"Predicted word: {word}, confidence: {confidence}")

@@ -182,3 +182,8 @@ def predict_sentence_gloss(model, frame_seq):
 if __name__ == "__main__":
     model = load_sentence_model("saved_models/sentence_level_model_states_v3.pth")
     print(model)
+
+    x = [torch.randn(num_nodes, in_channels) for _ in range(30)]  # Example input: 30 frames
+
+    sentence, confidence = predict_sentence_gloss(model, x)
+    print(f"Predicted word: {sentence}, confidence: {confidence}")

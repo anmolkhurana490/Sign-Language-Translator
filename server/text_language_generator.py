@@ -24,7 +24,7 @@ def generator(prompt, max_new_tokens=50):
       return ""
 
 def generate_text(gloss_input, last_text=''):
-    instruct = 'You are a gloss-to-English converter. Output only the sentence using only the gloss token. No need to complete it with additional words. No explanations.'
+    instruct = 'You are a gloss-to-English converter. Output only the sentence using only given gloss tokens. No need to complete it with additional words. No explanations.'
     prompt = f'{instruct}\nGloss: {gloss_input}\nSentence:'
 
     max_tokens = len(gloss_input.split()) + len(prompt.split())
