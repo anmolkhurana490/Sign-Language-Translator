@@ -69,36 +69,46 @@ class GlossBuffer:
 
   def update_buffer(self, curr_time):
     curr_time = time.time()
+
     if curr_time - self.last_gloss_time > SILENCE_TIMEOUT:
+      # Clear buffer after prolonged silence
       self.buffer.clear()
 
+    # Remove old glosses
     while len(self.buffer) > 0 and self.buffer[0][1] < curr_time - SILENCE_TIMEOUT:
       self.buffer.popleft()
 
   def get_buffer(self):
     return [t for t,c in self.buffer]
 
-  def get_gloss_text(self):
+  def get_gloss_list(self, counter):
     gloss_list = self.get_buffer()
 
-    if len(gloss_list) < MIN_TRIGGER:
-      return ''
+    if len(gloss_list) < MIN_TRIGGER and time.time() - counter['last_text_time'] < SILENCE_TIMEOUT:
+      # Not enough glosses to trigger generation and recently generated text
+      return []
+    
+    counter['last_text_time'] = time.time()
 
     # removing older glosses
     if len(gloss_list) > MAX_CONSUME:
       gloss_list = gloss_list[:MAX_CONSUME]
 
-    return ' '.join(gloss_list)
+    return gloss_list
   
 
-import random
+def generate_continue_text(gloss_buffer, text_buffer, counter):
+  gloss_list = gloss_buffer.get_gloss_list(counter)
 
-def generate_continue_text(gloss_buffer, text_buffer):
-  gloss_text = gloss_buffer.get_gloss_text()
-
-  if gloss_text != '':
+  if len(gloss_list) > 0:
     text_list = list(text_buffer)
-    gen_text = generate_text(gloss_text, ' '.join(text_list))
+
+    gloss_text = ' '.join(gloss_list)
+    
+    if len(gloss_list) >= MIN_TRIGGER:
+      gen_text = generate_text(gloss_text, ' '.join(text_list))
+    else:
+      gen_text = gloss_text
 
     if gen_text and gen_text.strip() != '':
       text_buffer.extend(gen_text.split())
@@ -117,4 +127,4 @@ if __name__ == "__main__":
 
     for word in text.split():
       gloss_buffer.append_gloss(word)
-      generate_continue_text(gloss_buffer, text_buffer)
+      generate_continue_text(gloss_buffer, text_buffer, {})

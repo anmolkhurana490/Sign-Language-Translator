@@ -2,6 +2,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from starlette.websockets import WebSocketState
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
+import time
 
 from landmark_extracter import extract_landmarks, process_frame, default_landmarks, correct_landmarks
 from word_level_model import load_word_model, predict_word_gloss
@@ -20,9 +21,10 @@ app.add_middleware(
 )
 
 word_model = load_word_model('saved_models/word_level_model_states_include.pth')
-thres_word_conf = 0.99
+thres_word_conf = 0.5
+INFERENCE_INTERVAL = 1  # 1 seconds
 
-def gloss_prediction(frameData, frame_buffer, gloss_buffer, prev_lm):
+def gloss_prediction(frameData, frame_buffer, gloss_buffer, prev_lm, counter):
     """Receives frames, predicts glosses, and fills buffer."""
     try:
         frame = decode_frame(frameData)
@@ -38,14 +40,21 @@ def gloss_prediction(frameData, frame_buffer, gloss_buffer, prev_lm):
         frame_buffer.add_frame(corrected_lm)
 
         frame_seq = frame_buffer.get_frames()
+
+        if len(frame_seq) == 0 or time.time() - counter['last_inference_time'] < INFERENCE_INTERVAL:
+            # Not enough frames yet or recently predicted gloss
+            return None
+        
+        counter['last_inference_time'] = time.time()
+        
         word_gloss, word_conf = predict_word_gloss(word_model, frame_seq)
+        print(f"Predicted Word Gloss: {word_gloss} with confidence {word_conf}")
 
         if word_conf >= thres_word_conf:
             gloss_buffer.append_gloss(word_gloss)
 
         # text = generate_continue_text(text_buffer, gloss_buffer)
         # text = word_gloss + " " + sentence_gloss
-        print(f"Predicted Word Gloss: {word_gloss} with confidence {word_conf}")
 
         result = {
             "word_confidence": word_conf,
@@ -58,10 +67,10 @@ def gloss_prediction(frameData, frame_buffer, gloss_buffer, prev_lm):
         return {"status": "error", "message": str(e)}
 
 
-def text_generation(gloss_buffer, text_buffer):
+def text_generation(gloss_buffer, text_buffer, counter):
     """Reads glosses and generates text asynchronously."""
     try:
-        gen_text = generate_continue_text(gloss_buffer, text_buffer)
+        gen_text = generate_continue_text(gloss_buffer, text_buffer, counter)
 
         if gen_text:
             text_buffer.extend(gen_text.split())
@@ -84,10 +93,14 @@ async def websocket_endpoint(websocket: WebSocket):
 
     prev_lm = default_landmarks.copy()
 
+    counter = {'last_inference_time': time.time(), 'last_text_time': time.time()}
+
     async def gloss_prediction_loop(websocket, frame_buffer, gloss_buffer):
         async for frame_data in websocket.iter_text():
-            res = gloss_prediction(frame_data, frame_buffer, gloss_buffer, prev_lm)
-            await websocket.send_json(res)
+            res = gloss_prediction(frame_data, frame_buffer, gloss_buffer, prev_lm, counter)
+
+            if res is not None:
+                await websocket.send_json(res)
 
     async def text_generation_loop(websocket, gloss_buffer, text_buffer):
         while websocket.client_state == WebSocketState.CONNECTED:
@@ -96,7 +109,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if websocket.client_state == WebSocketState.DISCONNECTED:
                 break
             
-            res = text_generation(gloss_buffer, text_buffer)
+            res = text_generation(gloss_buffer, text_buffer, counter)
 
             if websocket.client_state == WebSocketState.DISCONNECTED:
                 break

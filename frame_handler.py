@@ -3,7 +3,7 @@ import base64
 import numpy as np
 import cv2
 
-MIN_SEQUENCE_LENGTH = 3
+MIN_SEQUENCE_LENGTH = 5
 
 class FrameBuffer:
     def __init__(self, max_size=16):
@@ -14,7 +14,7 @@ class FrameBuffer:
 
     def get_frames(self):
         if len(self.buffer) < MIN_SEQUENCE_LENGTH:
-            return None
+            return []
         
         return list(self.buffer)
 
