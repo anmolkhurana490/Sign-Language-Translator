@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torch import nn
 import json
+from huggingface_hub import hf_hub_download
 
 in_channels = 3
 num_nodes = 67
@@ -136,7 +137,12 @@ class MyModel(nn.Module):
 
 # ----- Load Model -----
 def load_word_model(state_dict_path):
-    state_dict = torch.load(state_dict_path, map_location='cpu')
+    # Load model state dict from local path
+    # state_dict = torch.load(state_dict_path, map_location='cpu')
+
+    # Download model state from Hugging Face Hub
+    model_path = hf_hub_download(repo_id="Anmolkhurana88/word_level_model_states_include", filename=state_dict_path)
+    state_dict = torch.load(model_path, map_location='cpu')
 
     model = MyModel(
         num_nodes*in_channels,
