@@ -1,0 +1,9 @@
+.ipynb_checkpoints
+
+__pycache__
+*.pyc
+
+.env
+
+data/preprocessed_video_*.pth
+saved_models/*
