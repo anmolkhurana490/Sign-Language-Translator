@@ -1,5 +1,5 @@
 # get base image
-FROM python:3.11-slim
+FROM python:3.11-alpine
 
 # Set environment variables to optimize Python behavior in Docker
 ENV PYTHONUNBUFFERED=1
