@@ -1,0 +1,10 @@
+.ipynb_checkpoints
+
+.venv
+__pycache__
+*.pyc
+
+.env
+
+model_training/data/preprocessed_video_*.pth
+model_training/saved_models/*
