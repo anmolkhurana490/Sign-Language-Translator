@@ -24,6 +24,10 @@ word_model = load_word_model('saved_models/word_level_model_states_include.pth')
 thres_word_conf = 0.5
 INFERENCE_INTERVAL = 1  # 1 seconds
 
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Sign Language Translator is running on Hugging Face Spaces"}
+
 def gloss_prediction(frameData, frame_buffer, gloss_buffer, prev_lm, counter):
     """Receives frames, predicts glosses, and fills buffer."""
     try:
@@ -131,16 +135,19 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.post('/upload-image')
 async def upload_image(image: UploadFile = File(...)):
     try:
-        content = await image.read()
+        # content = await image.read()
         
-        frame = decode_image_file(content)
-        landmarks = extract_landmarks(frame)
-        word_gloss, word_conf = predict_word_gloss(word_model, landmarks)
+        # frame = decode_image_file(content)
 
-        response = {
-            "text": word_gloss.lower() if word_conf >= thres_word_conf else "",
-            "word_confidence": word_conf,
-        }
+        # landmarks = extract_landmarks(frame)
+        # word_gloss, word_conf = predict_word_gloss(word_model, landmarks)
+
+        # response = {
+        #     "text": word_gloss.lower() if word_conf >= thres_word_conf else "",
+        #     "word_confidence": word_conf,
+        # }
+
+        response = {"message": "Image upload endpoint is depreciated."}
 
         return {"status": "success", "result": response}
     
