@@ -34,7 +34,7 @@ const Sign2Text = () => {
 
     // Camera settings
     const [resolution, setResolution] = useState({ width: 640, height: 480 }) // Default resolution
-    const [fps, setFps] = useState(10) // Frames per second for processing
+    const [fps, setFps] = useState(9) // Frames per second for processing
     const [mirror, setMirror] = useState(false)
 
     const toggleRecording = () => {
