@@ -34,7 +34,7 @@ const Sign2Text = () => {
 
     // Camera settings
     const [resolution, setResolution] = useState({ width: 640, height: 480 }) // Default resolution
-    const [fps, setFps] = useState(4) // Frames per second for processing
+    const [fps, setFps] = useState(10) // Frames per second for processing
     const [mirror, setMirror] = useState(false)
 
     const toggleRecording = () => {
@@ -262,9 +262,10 @@ const Sign2Text = () => {
                                         value={fps}
                                         onChange={(e) => setFps(Number(e.target.value))}
                                     >
-                                        <option value={3}>3 FPS</option>
-                                        <option value={4}>4 FPS</option>
-                                        <option value={5}>5 FPS</option>
+                                        <option value={7}>7 FPS</option>
+                                        <option value={8}>8 FPS</option>
+                                        <option value={9}>9 FPS</option>
+                                        <option value={10}>10 FPS</option>
                                     </select>
                                 </div>
 

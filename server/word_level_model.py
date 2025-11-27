@@ -151,8 +151,9 @@ def load_word_model(state_dict_path):
     )
 
     model.load_state_dict(state_dict)
-    model.eval()
+    model.to(device)
 
+    model.eval()
     return model
 
 
@@ -162,11 +163,11 @@ def predict_word_gloss(model, frame_seq):
         return "", 0.0
     
     x = torch.stack(frame_seq).unsqueeze(0).to(device)
-    x = x[:, :, :num_nodes, :in_channels].to(torch.float32)
+    x = x.to(dtype=torch.float32)
 
     with torch.no_grad():
         out = model(x)
-        out = nn.functional.sigmoid(out)
+        out = nn.functional.softmax(out, dim=1)
 
     val, ypred = torch.max(out, 1)
     return word_decoder[ypred.item()], val.item()

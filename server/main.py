@@ -21,8 +21,8 @@ app.add_middleware(
 )
 
 word_model = load_word_model('saved_models/word_level_model_states_include.pth')
-thres_word_conf = 0.5
-INFERENCE_INTERVAL = 1  # 1 seconds
+thres_word_conf = 0.75
+INFERENCE_INTERVAL = 0.2  # 0.2 seconds
 
 @app.get("/")
 async def root():
@@ -91,7 +91,7 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("Client connected")
 
-    frame_buffer = FrameBuffer(max_size=40)
+    frame_buffer = FrameBuffer(max_size=25)
     gloss_buffer = GlossBuffer()
     text_buffer = create_text_buffer()
 

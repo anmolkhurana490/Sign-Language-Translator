@@ -3,10 +3,10 @@ import base64
 import numpy as np
 import cv2
 
-MIN_SEQUENCE_LENGTH = 5
+MIN_SEQUENCE_LENGTH = 3
 
 class FrameBuffer:
-    def __init__(self, max_size=16):
+    def __init__(self, max_size=25):
         self.buffer = deque(maxlen=max_size)
 
     def add_frame(self, frame):
@@ -28,6 +28,11 @@ def decode_frame(frameData):
         frame_bytes = base64.b64decode(frameData)
         np_arr = np.frombuffer(frame_bytes, np.uint8)
         frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+        frame = cv2.resize(frame, (640, 480))
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # frame = cv2.flip(frame, 1)
+
         return frame
     except Exception as e:
         print(f"Error decoding frame: {e}")
@@ -36,4 +41,9 @@ def decode_frame(frameData):
 def decode_image_file(image):
     nparr = np.frombuffer(image, np.uint8)
     frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    frame = cv2.resize(frame, (640, 480))
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    # frame = cv2.flip(frame, 1)
+
     return frame

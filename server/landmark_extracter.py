@@ -7,7 +7,7 @@ mp_holistic = mp.solutions.holistic
 mp_drawing = mp.solutions.drawing_utils
 
 holistic = mp_holistic.Holistic(
-    static_image_mode=True,
+    static_image_mode=False,
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5,
     model_complexity=2
@@ -38,11 +38,7 @@ def detect_landmarks(image):
     return landmarks
 
 def process_frame(frame):
-    frame = cv2.resize(frame, (640, 480))
-    frame = cv2.flip(frame, 1)
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-    result = detect_landmarks(frame_rgb)
+    result = detect_landmarks(frame)
 
     if result['left_hand']:
       mp_drawing.draw_landmarks(frame, result['left_hand'], mp_holistic.HAND_CONNECTIONS)
