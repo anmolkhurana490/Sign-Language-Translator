@@ -34,8 +34,17 @@ const Sign2Text = () => {
 
     // Camera settings
     const [resolution, setResolution] = useState({ width: 640, height: 480 }) // Default resolution
-    const [fps, setFps] = useState(9) // Frames per second for processing
+    const [fps, setFps] = useState(5) // Frames per second for processing
     const [mirror, setMirror] = useState(false)
+
+    // Update capture interval when fps changes
+    useEffect(() => {
+        if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) return;
+
+        if (captureIntervalId) clearInterval(captureIntervalId)
+
+        setCaptureIntervalId(setInterval(sendFrame, 1000 / fps))
+    }, [fps])
 
     const toggleRecording = () => {
         if (!isLiveCameraOpen) {
@@ -79,6 +88,11 @@ const Sign2Text = () => {
         // Wait for socket to open
         socketRef.current.onopen = () => {
             console.log("WebSocket connected")
+
+            const video = videoRef.current
+            if (!video) return;
+
+            // video.onloadedmetadata = () => {
             const intervalId = setInterval(sendFrame, 1000 / fps)
             setCaptureIntervalId(intervalId)
         }
@@ -126,6 +140,12 @@ const Sign2Text = () => {
     }
 
     const sendFrame = () => {
+        const video = videoRef.current
+        if (video.videoWidth === 0 || video.videoHeight === 0) {
+            console.warn("Video dimensions not ready")
+            return;
+        }
+
         if (!videoRef.current || !socketRef.current) {
             console.warn("Video or Socket not available")
             return;
@@ -135,8 +155,13 @@ const Sign2Text = () => {
             return;
         }
 
-        const video = videoRef.current
+        console.log("Sending frame for processing")
+
         const canvas = document.createElement('canvas')
+
+        // Set canvas dimensions to video dimensions
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
 
         const ctx = canvas.getContext('2d')
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
@@ -156,6 +181,7 @@ const Sign2Text = () => {
         if (uploadFileType === 'video' && !captureIntervalId) {
             // If video file is uploaded, restart the video
             if (uploadFile) {
+                // videoRef.current.onloadedmetadata = () => {
                 videoRef.current.currentTime = 0
                 videoRef.current.play()
             }
@@ -262,10 +288,10 @@ const Sign2Text = () => {
                                         value={fps}
                                         onChange={(e) => setFps(Number(e.target.value))}
                                     >
+                                        <option value={4}>4 FPS</option>
+                                        <option value={5}>5 FPS</option>
+                                        <option value={6}>6 FPS</option>
                                         <option value={7}>7 FPS</option>
-                                        <option value={8}>8 FPS</option>
-                                        <option value={9}>9 FPS</option>
-                                        <option value={10}>10 FPS</option>
                                     </select>
                                 </div>
 

@@ -6,7 +6,7 @@ import cv2
 MIN_SEQUENCE_LENGTH = 3
 
 class FrameBuffer:
-    def __init__(self, max_size=25):
+    def __init__(self, max_size=20):
         self.buffer = deque(maxlen=max_size)
 
     def add_frame(self, frame):
@@ -29,7 +29,7 @@ def decode_frame(frameData):
         np_arr = np.frombuffer(frame_bytes, np.uint8)
         frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-        frame = cv2.resize(frame, (640, 480))
+        # frame = cv2.resize(frame, (1920, 1080))
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         # frame = cv2.flip(frame, 1)
 

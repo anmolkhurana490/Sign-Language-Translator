@@ -8,6 +8,7 @@ from landmark_extracter import extract_landmarks, process_frame, default_landmar
 from word_level_model import load_word_model, predict_word_gloss
 from text_language_generator import generate_continue_text, GlossBuffer, create_text_buffer
 from frame_handler import FrameBuffer, decode_frame, decode_image_file
+import numpy as np
 
 app = FastAPI()
 
@@ -21,7 +22,7 @@ app.add_middleware(
 )
 
 word_model = load_word_model('saved_models/word_level_model_states_include.pth')
-thres_word_conf = 0.75
+thres_word_conf = 0.8
 INFERENCE_INTERVAL = 0.2  # 0.2 seconds
 
 @app.get("/")
@@ -91,7 +92,7 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("Client connected")
 
-    frame_buffer = FrameBuffer(max_size=25)
+    frame_buffer = FrameBuffer(max_size=20)
     gloss_buffer = GlossBuffer()
     text_buffer = create_text_buffer()
 
@@ -105,6 +106,11 @@ async def websocket_endpoint(websocket: WebSocket):
 
             if res is not None:
                 await websocket.send_json(res)
+
+        # print(len(frame_buffer.buffer), "frames in buffer")
+        # pose_npy = np.array(frame_buffer.get_frames())
+        # pose_npy.dump("buffered_frames.npy")
+        # print("Saved buffered frames to buffered_frames.npy")
 
     async def text_generation_loop(websocket, gloss_buffer, text_buffer):
         while websocket.client_state == WebSocketState.CONNECTED:
