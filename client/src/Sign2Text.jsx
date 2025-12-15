@@ -155,13 +155,11 @@ const Sign2Text = () => {
             return;
         }
 
-        console.log("Sending frame for processing")
-
         const canvas = document.createElement('canvas')
 
-        // Set canvas dimensions to video dimensions
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
+        // Set canvas dimensions to desired resolution
+        canvas.width = resolution.width
+        canvas.height = resolution.height
 
         const ctx = canvas.getContext('2d')
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
@@ -169,7 +167,8 @@ const Sign2Text = () => {
         let frameData = canvas.toDataURL('image/jpeg', 0.8);
 
         // Send frameData to backend for processing
-        socketRef.current.send(frameData)
+        console.log("Sending frame for processing", new Date().getTime());
+        socketRef.current.send(frameData);
     }
 
     // Start real-time or image/video translation
