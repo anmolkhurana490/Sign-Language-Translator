@@ -173,9 +173,41 @@ def predict_word_gloss(model, frame_seq):
     return word_decoder[ypred.item()], val.item()
 
 
+# def evaluate(model, data_loader, in_channels, total, criterion):
+#   model.eval()
+#   total_correct = 0
+
+#   total_loss = 0
+#   class_to_label = {class_name: i for i, class_name in enumerate(word_decoder)}
+
+#   with torch.no_grad():
+#     for features, labels in zip(data_loader[0][:total], data_loader[1][:total]):
+#         features = features[:, :, :in_channels].to(device)
+#         labels = torch.tensor([class_to_label[labels]])
+
+#         outputs = model(torch.stack([features]).to(torch.float32))
+#         loss = criterion(outputs, labels)
+
+#         total_loss += loss.item()
+
+#         y_pred = nn.functional.softmax(outputs, dim=1)
+#         _, predicted = torch.max(y_pred, 1)
+
+#         total_correct += (predicted == labels).sum().item()
+
+#   accuracy = total_correct / total
+#   avg_loss = total_loss / total
+#   return avg_loss, accuracy
+
 if __name__ == "__main__":
     model = load_word_model("saved_models/word_level_model_states_include.pth")
     print(model)
+
+    # data_model = torch.load('../model_training/data/preprocessed_video_INCLUDE_data.pth', weights_only=False)
+    # print(len(data_model['train'][0]), len(data_model['test'][0]))
+
+    # avg_loss, accuracy = evaluate(model, data_model['test'], 3, 851, nn.CrossEntropyLoss(label_smoothing=0.1))
+    # print("Avg Loss:", avg_loss, "Accuracy:", accuracy)
 
     x = [torch.randn(num_nodes, in_channels) for _ in range(30)]  # Example input: 30 frames
 
