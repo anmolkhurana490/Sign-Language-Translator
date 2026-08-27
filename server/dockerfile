@@ -7,23 +7,8 @@ FROM python:3.11-slim as builder
 ENV PIP_NO_CACHE_DIR=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install Git
-RUN apk add --no-cache git
-
 # Set working directory
 WORKDIR /app
-
-# Define the repository URL and the target subfolder as build arguments
-ARG REPO_URL="https://github.com/anmolkhurana490/Sign-Language-Translator.git"
-ARG TARGET_FOLDER="server"
-
-# Clone the public GitHub repository (only target subfolder)
-RUN git init && \
-    git remote add origin ${REPO_URL} && \
-    git config core.sparseCheckout true && \
-    git sparse-checkout init --cone && \
-    git sparse-checkout set ${TARGET_FOLDER} && \
-    git pull origin main
 
 # Copy only requirements to cache dependencies
 COPY requirements.txt .
