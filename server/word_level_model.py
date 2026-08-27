@@ -3,6 +3,10 @@ import torch
 from torch import nn
 import json
 from huggingface_hub import hf_hub_download
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 in_channels = 3
 num_nodes = 67
@@ -141,7 +145,8 @@ def load_word_model(state_dict_path):
     # state_dict = torch.load(state_dict_path, map_location='cpu')
 
     # Download model state from Hugging Face Hub
-    model_path = hf_hub_download(repo_id="Anmolkhurana88/word_level_model_states_include", filename=state_dict_path)
+    MODEL_ID = os.getenv("HF_MODEL_REPO_ID", "")
+    model_path = hf_hub_download(repo_id=MODEL_ID, filename=state_dict_path)
     state_dict = torch.load(model_path, map_location='cpu')
 
     model = MyModel(
